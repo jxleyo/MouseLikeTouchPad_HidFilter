@@ -1,2 +1,2 @@
 # MouseLikeTouchPad_HidFilter
-MouseLikeTouchPad Hid Filter
+MouseLikeTouchPad Hid Filter for windows10 / windows11
