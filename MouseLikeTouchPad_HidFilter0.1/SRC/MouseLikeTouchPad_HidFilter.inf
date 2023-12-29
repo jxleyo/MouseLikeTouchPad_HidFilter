@@ -1,0 +1,92 @@
+;
+; MouseLikeTouchPad_HidFilter.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class = HIDClass
+ClassGuid = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
+Provider=%ManufacturerName%
+CatalogFile=MouseLikeTouchPad_HidFilter.cat
+DriverVer=08/18/2023,1.0.0.0
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[ControlFlags]
+; We don't want our device to be installable via the non-PnP hardware dialogs
+ExcludeFromSelect = *
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+MouseLikeTouchPad_HidFilter.sys  = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$.10.0
+
+[Standard.NT$ARCH$.10.0]
+; The fact is, you can't filter HIDUSB or friends directly, because they load the export driver called
+; HIDCLASS which overrides their IO Major Function pointers. Therefore we still implement our own HID miniport 
+; transport, but in fact reusing the underlying HID transport (either Bluetooth or USB).
+; Some high-level patches involved to modify the underlying driver IO handlers.
+
+%MouseLikeTouchPad_HidFilter.DeviceDesc%=MouseLikeTouchPad_HidFilter_MiniPortDevice, HID\VID_17EF&UP:000D_U:0005;;//lenovo Duet BT Folio
+%MouseLikeTouchPad_HidFilter.DeviceDesc%=MouseLikeTouchPad_HidFilter_MiniPortDevice, HID\VID_048D&UP:000D_U:0005;;//hantickå«ÌìöÎ´¥Ãþ°å
+%MouseLikeTouchPad_HidFilter.DeviceDesc%=MouseLikeTouchPad_HidFilter_MiniPortDevice, HID\VID_06CB&UP:000D_U:0005;;//Synaptics´¥Ãþ°åÉè±¸Ó²¼þid
+
+
+[FilterDriver_Payload]
+MouseLikeTouchPad_HidFilter.sys
+
+[MouseLikeTouchPad_HidFilter_MiniPortDevice.NT]
+CopyFiles=FilterDriver_Payload
+
+
+;-------------- Service installation
+[MouseLikeTouchPad_HidFilter_MiniPortDevice.NT.Services]
+AddService = MouseLikeTouchPad_HidFilter,, MouseLikeTouchPad_HidFilter_Service_Inst
+AddService = mshidkmdf, %SPSVCINST_ASSOCSERVICE%, mshidkmdf_Service_Inst
+
+[MouseLikeTouchPad_HidFilter_MiniPortDevice.NT.HW]
+AddReg=MouseLikeTouchPad_HidFilter_AddReg
+
+[MouseLikeTouchPad_HidFilter_AddReg]
+HKR,,FriendlyName,,%MouseLikeTouchPad_HidFilter.DeviceDesc%
+HKR,,"LowerFilters",0x00010008,"MouseLikeTouchPad_HidFilter"
+
+[MouseLikeTouchPad_HidFilter_MiniPortDevice.NT.Wdf]
+KmdfService = MouseLikeTouchPad_HidFilter, MouseLikeTouchPad_HidFilter_wdfsect
+
+; -------------- Microsoft HID KMDF driver install sections
+[mshidkmdf_Service_Inst]
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 1                  ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %10%\System32\Drivers\mshidkmdf.sys
+
+; -------------- MouseLikeTouchPad_HidFilter driver install sections
+[MouseLikeTouchPad_HidFilter_Service_Inst]
+DisplayName    = %MouseLikeTouchPad_HidFilter.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\MouseLikeTouchPad_HidFilter.sys
+
+[MouseLikeTouchPad_HidFilter_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName = "jxleyo.HRP"
+DiskName = "MouseLikeTouchPad HID Filter Installation Disk"
+MouseLikeTouchPad_HidFilter_RootDevice.DeviceDesc = "MouseLikeTouchPad HID Filter Device"
+MouseLikeTouchPad_HidFilter.DeviceDesc = "MouseLikeTouchPad HID Filter"
+MouseLikeTouchPad_HidFilter.NullDeviceDesc = "MouseLikeTouchPad HID Filter Services"
+MouseLikeTouchPad_HidFilter.SVCDESC = "MouseLikeTouchPad HID Filter Service"
