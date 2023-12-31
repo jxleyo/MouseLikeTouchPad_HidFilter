@@ -1296,10 +1296,8 @@ PtpFilterInputRequestCompletionCallback(
 	PDEVICE_CONTEXT deviceContext;
 	NTSTATUS status = STATUS_SUCCESS;
 
-	WDFREQUEST ptpRequest;
     PUCHAR pOutputReport;
     PTP_REPORT OutputReport;
-	WDFMEMORY  ptpRequestMemory;
 
 	size_t responseLength;
 	PUCHAR TouchDataBuffer;
@@ -1434,7 +1432,7 @@ PtpFilterInputRequestCompletionCallback(
         //    KdPrint(("OnInterruptIsr SendOriginalReport failed,%x\n", runtimes_ioControl));
         //}
         KdPrint(("PtpFilterInputRequestCompletionCallback PtpInputModeOn not ready,%x\n", runtimes_IOCTL));
-        goto Exit;
+        goto cleanup;
     }
 
 
@@ -1490,41 +1488,6 @@ PtpFilterInputRequestCompletionCallback(
         MouseLikeTouchPad_parse(deviceContext, &ptpReport);
     }
 
-    KdPrint(("PtpFilterInputRequestCompletionCallback SendReport end,%x\n", runtimes_IOCTL));
-    goto Exit;
-
-
-
-Exit:
-    KdPrint(("PtpFilterInputRequestCompletionCallback end,%x\n", status));
-
-
-	// Read report and fulfill PTP request. If no report is found, just exit.
-	status = WdfIoQueueRetrieveNextRequest(deviceContext->HidReadQueue, &ptpRequest);
-	if (!NT_SUCCESS(status)) {
-		KdPrint(("PtpFilterInputRequestCompletionCallback WdfIoQueueRetrieveNextRequest failed,%x\n", status));
-		goto cleanup;
-	}
-
-
-	status = WdfRequestRetrieveOutputMemory(ptpRequest, &ptpRequestMemory);
-	if (!NT_SUCCESS(status))
-	{
-		KdPrint(("PtpFilterInputRequestCompletionCallback WdfRequestRetrieveOutputMemory failed,%x\n", status));
-		WdfDeviceSetFailed(deviceContext->Device, WdfDeviceFailedAttemptRestart);
-		goto cleanup;
-	}
-
-	status = WdfMemoryCopyFromBuffer(ptpRequestMemory, 0, pOutputReport, OutputSize);
-	if (!NT_SUCCESS(status))
-	{
-		KdPrint(("PtpFilterInputRequestCompletionCallback WdfMemoryCopyFromBuffer failed,%x\n", status));
-		WdfDeviceSetFailed(deviceContext->Device, WdfDeviceFailedAttemptRestart);
-		goto cleanup;
-	}
-
-	WdfRequestSetInformation(ptpRequest, OutputSize);
-	WdfRequestComplete(ptpRequest, status);
 
 cleanup:
 	// Cleanup
@@ -1853,7 +1816,7 @@ NTSTATUS SetRegisterMouseSensitivity(PDEVICE_CONTEXT pDevContext, ULONG ms_idx)/
 
     NTSTATUS status = STATUS_SUCCESS;
 
-    status = SetRegConfig(pDevContext, L"_MouseSensitivity_Index", ms_idx);
+    status = SetRegConfig(pDevContext, L"MouseSensitivity_Index", ms_idx);
     if (!NT_SUCCESS(status)) {
         KdPrint(("SetRegisterMouseSensitivity err,%x\n", status));
         return status;
@@ -1870,7 +1833,7 @@ NTSTATUS GetRegisterMouseSensitivity(PDEVICE_CONTEXT pDevContext, ULONG *ms_idx)
 
     NTSTATUS status = STATUS_SUCCESS;
 
-    status = GetRegConfig(pDevContext, L"_MouseSensitivity_Index", ms_idx);
+    status = GetRegConfig(pDevContext, L"MouseSensitivity_Index", ms_idx);
     if (!NT_SUCCESS(status)) {
         KdPrint(("GetRegisterMouseSensitivity err,%x\n", status));
         return status;
@@ -1923,6 +1886,8 @@ NTSTATUS SetRegConfig(PDEVICE_CONTEXT pDevContext, WCHAR* strConfigName, ULONG n
     WCHAR strVIDheader[] = L"TouchPad_VID_";
     wcscpy(stringConfigName, strVIDheader);
     wcscat(stringConfigName, strVIDnum);
+    WCHAR strVIDend[] = L"_";
+    wcscat(stringConfigName, strVIDend);
 
     wcscat(stringConfigName, strConfigName);
 
@@ -1985,6 +1950,8 @@ NTSTATUS GetRegConfig(PDEVICE_CONTEXT pDevContext, WCHAR* strConfigName, PULONG 
     WCHAR strVIDheader[] = L"TouchPad_VID_";
     wcscpy(stringConfigName, strVIDheader);
     wcscat(stringConfigName, strVIDnum);
+    WCHAR strVIDend[] = L"_";
+    wcscat(stringConfigName, strVIDend);
 
     wcscat(stringConfigName, strConfigName);
 
@@ -2048,6 +2015,9 @@ NTSTATUS GetRegConfig(PDEVICE_CONTEXT pDevContext, WCHAR* strConfigName, PULONG 
 
 VOID init(PDEVICE_CONTEXT pDevContext) {
     NTSTATUS status = STATUS_SUCCESS;
+
+    pDevContext->ThumbScale_Index = 1;
+    pDevContext->ThumbScale_Value = ThumbScaleTable[pDevContext->ThumbScale_Index];
 
     //读取指头大小设置
     ULONG ts_idx;
@@ -2124,36 +2094,37 @@ SendOriginalReport(PDEVICE_CONTEXT pDevContext, PVOID OriginalReport, size_t out
     NTSTATUS status = STATUS_SUCCESS;
 
     WDFREQUEST PtpRequest;
-    WDFMEMORY  memory;
+    WDFMEMORY  ptpRequestMemory;
 
+    // Read report and fulfill PTP request. If no report is found, just exit.
     status = WdfIoQueueRetrieveNextRequest(pDevContext->HidReadQueue, &PtpRequest);
     if (!NT_SUCCESS(status)) {
-        KdPrint(("SendOriginalReport WdfIoQueueRetrieveNextRequest failed,%x\n", runtimes_IOCTL));
-        goto cleanup;
-    }
-
-    status = WdfRequestRetrieveOutputMemory(PtpRequest, &memory);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendOriginalReport WdfRequestRetrieveOutputMemory failed,%x\n", runtimes_IOCTL));
+        KdPrint(("SendOriginalReport WdfIoQueueRetrieveNextRequest failed,%x\n", status));
         goto exit;
     }
 
-    status = WdfMemoryCopyFromBuffer(memory, 0, OriginalReport, outputBufferLength);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendOriginalReport WdfMemoryCopyFromBuffer failed,%x\n", runtimes_IOCTL));
+
+    status = WdfRequestRetrieveOutputMemory(PtpRequest, &ptpRequestMemory);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendOriginalReport WdfRequestRetrieveOutputMemory failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
+        goto exit;
+    }
+
+    status = WdfMemoryCopyFromBuffer(ptpRequestMemory, 0, OriginalReport, outputBufferLength);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendOriginalReport WdfMemoryCopyFromBuffer failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
         goto exit;
     }
 
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
-    KdPrint(("SendOriginalReport ok,%x\n", status));
+    WdfRequestComplete(PtpRequest, status);
+
 
 exit:
-    WdfRequestComplete(
-        PtpRequest,
-        status
-    );
-
-cleanup:
     KdPrint(("SendOriginalReport end,%x\n", status));
     return status;
 
@@ -2165,36 +2136,37 @@ SendPtpMultiTouchReport(PDEVICE_CONTEXT pDevContext, PVOID MultiTouchReport, siz
     NTSTATUS status = STATUS_SUCCESS;
 
     WDFREQUEST PtpRequest;
-    WDFMEMORY  memory;
+    WDFMEMORY  ptpRequestMemory;
 
+    // Read report and fulfill PTP request. If no report is found, just exit.
     status = WdfIoQueueRetrieveNextRequest(pDevContext->HidReadQueue, &PtpRequest);
     if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMultiTouchReport WdfIoQueueRetrieveNextRequest failed,%x\n", runtimes_IOCTL));
-        goto cleanup;
-    }
-
-    status = WdfRequestRetrieveOutputMemory(PtpRequest, &memory);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMultiTouchReport WdfRequestRetrieveOutputMemory failed,%x\n", runtimes_IOCTL));
+        KdPrint(("SendPtpMultiTouchReport WdfIoQueueRetrieveNextRequest failed,%x\n", status));
         goto exit;
     }
 
-    status = WdfMemoryCopyFromBuffer(memory, 0, MultiTouchReport, outputBufferLength);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMultiTouchReport WdfMemoryCopyFromBuffer failed,%x\n", runtimes_IOCTL));
+
+    status = WdfRequestRetrieveOutputMemory(PtpRequest, &ptpRequestMemory);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendPtpMultiTouchReport WdfRequestRetrieveOutputMemory failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
+        goto exit;
+    }
+
+    status = WdfMemoryCopyFromBuffer(ptpRequestMemory, 0, MultiTouchReport, outputBufferLength);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendPtpMultiTouchReport WdfMemoryCopyFromBuffer failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
         goto exit;
     }
 
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
-    KdPrint(("SendPtpMultiTouchReport ok,%x\n", status));
+    WdfRequestComplete(PtpRequest, status);
+
 
 exit:
-    WdfRequestComplete(
-        PtpRequest,
-        status
-    );
-
-cleanup:
     KdPrint(("SendPtpMultiTouchReport end,%x\n", status));
     return status;
 
@@ -2206,38 +2178,39 @@ SendPtpMouseReport(PDEVICE_CONTEXT pDevContext, struct mouse_report_t* pMouseRep
     NTSTATUS status = STATUS_SUCCESS;
 
     WDFREQUEST PtpRequest;
-    WDFMEMORY  memory;
+    WDFMEMORY  ptpRequestMemory;
     size_t     outputBufferLength = sizeof(struct mouse_report_t);
     //KdPrint(("SendPtpMouseReport pMouseReport=", pMouseReport, (ULONG)outputBufferLength);
 
+    // Read report and fulfill PTP request. If no report is found, just exit.
     status = WdfIoQueueRetrieveNextRequest(pDevContext->HidReadQueue, &PtpRequest);
     if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMouseReport WdfIoQueueRetrieveNextRequest failed,%x\n", runtimes_IOCTL));
-        goto cleanup;
-    }
-
-    status = WdfRequestRetrieveOutputMemory(PtpRequest, &memory);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMouseReport WdfRequestRetrieveOutputMemory failed,%x\n", runtimes_IOCTL));
+        KdPrint(("SendPtpMouseReport WdfIoQueueRetrieveNextRequest failed,%x\n", status));
         goto exit;
     }
 
-    status = WdfMemoryCopyFromBuffer(memory, 0, pMouseReport, outputBufferLength);
-    if (!NT_SUCCESS(status)) {
-        KdPrint(("SendPtpMouseReport WdfMemoryCopyFromBuffer failed,%x\n", runtimes_IOCTL));
+
+    status = WdfRequestRetrieveOutputMemory(PtpRequest, &ptpRequestMemory);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendPtpMouseReport WdfRequestRetrieveOutputMemory failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
+        goto exit;
+    }
+
+    status = WdfMemoryCopyFromBuffer(ptpRequestMemory, 0, pMouseReport, outputBufferLength);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("SendPtpMouseReport WdfMemoryCopyFromBuffer failed,%x\n", status));
+        WdfDeviceSetFailed(pDevContext->Device, WdfDeviceFailedAttemptRestart);
         goto exit;
     }
 
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
-    KdPrint(("SendPtpMouseReport ok,%x\n", status));
+    WdfRequestComplete(PtpRequest, status);
+
 
 exit:
-    WdfRequestComplete(
-        PtpRequest,
-        status
-    );
-
-cleanup:
     KdPrint(("SendPtpMouseReport end,%x\n", status));
     return status;
 
