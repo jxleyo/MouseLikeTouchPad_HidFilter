@@ -210,6 +210,13 @@ PtpFilterPrepareHardware(
 
     RtlZeroMemory(&deviceContext->tp_settings, sizeof(PTP_PARSER));
 
+    deviceContext->PtpInputModeOn = FALSE;
+
+    deviceContext->bMouseLikeTouchPad_Mode = TRUE;//默认初始值为仿鼠标触摸板操作方式
+
+    deviceContext->DeviceConfigured = FALSE;
+
+
     KdPrint(("PtpFilterPrepareHardware end, %x\n", status)); 
     return status;
 }
@@ -233,27 +240,9 @@ PtpFilterDeviceD0Entry(
     runtimes_IOREAD = 0;
     runtimes_SelfManagedIoInit = 0;
 
-    pDevContext->PtpInputModeOn = FALSE;
-
-    pDevContext->bMouseLikeTouchPad_Mode = TRUE;//默认初始值为仿鼠标触摸板操作方式
-
-    pDevContext->ThumbScale_Index = 1;
-    pDevContext->ThumbScale_Value = ThumbScaleTable[pDevContext->ThumbScale_Index];
-
-
-    PTP_PARSER* tp = &pDevContext->tp_settings;
-    //动态调整手指头大小常量
-    tp->thumb_Scale = pDevContext->ThumbScale_Index;//手指头尺寸缩放比例，
-    tp->FingerMinDistance = 12 * tp->TouchPad_DPMM_x * tp->thumb_Scale;//定义有效的相邻手指最小距离
-    tp->FingerClosedThresholdDistance = 16 * tp->TouchPad_DPMM_x * tp->thumb_Scale;//定义相邻手指合拢时的最小距离
-    tp->FingerMaxDistance = tp->FingerMinDistance * 4;//定义有效的相邻手指最大距离(FingerMinDistance*4) 
-
-
-    //
-    pDevContext->MouseSensitivity_Index = 1;//默认初始值为MouseSensitivityTable存储表的序号1项
-    pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];//默认初始值为1.0
-
-   
+    if (pDevContext->DeviceConfigured) {
+        init(pDevContext);//
+    }
 
     KdPrint(("PtpFilterDeviceD0Entry end, %x\n", status));
     return status;
@@ -1111,14 +1100,14 @@ PtpFilterSetHidFeatures(
 				{
                     KdPrint(("PtpFilterSetHidFeatures PTP_COLLECTION_MOUSE,%x\n", status));
 					
-					deviceContext->PtpInputOn = FALSE;
+					deviceContext->PtpInputModeOn = FALSE;
 					break;
 				}
 				case PTP_COLLECTION_WINDOWS:
 				{
                     KdPrint(("PtpFilterSetHidFeatures PTP_COLLECTION_WINDOWS,%x\n", status));
 					
-					deviceContext->PtpInputOn = TRUE;
+					deviceContext->PtpInputModeOn = TRUE;
 					break;
 				}
 			}
@@ -1437,7 +1426,6 @@ PtpFilterInputRequestCompletionCallback(
 
 
     ptpReport = *(PPTP_REPORT)pOutputReport;
-    ptpReport.ReportID = FAKE_REPORTID_MULTITOUCH;
     //KdPrint(("PtpFilterInputRequestCompletionCallback PTP_REPORT.ReportID,%x\n", ptpReport.ReportID));
     //KdPrint(("PtpFilterInputRequestCompletionCallback PTP_REPORT.IsButtonClicked,%x\n", ptpReport.IsButtonClicked));
     //KdPrint(("PtpFilterInputRequestCompletionCallback PTP_REPORT.ScanTime,%x\n", ptpReport.ScanTime));

@@ -1064,11 +1064,9 @@ typedef struct _DEVICE_CONTEXT
     PUCHAR pPtpHidReportDesc;
 
     // PTP report specific
-    BOOLEAN         PtpInputOn;
+    BOOLEAN         PtpInputModeOn;
     BOOLEAN         PtpReportTouch;
     BOOLEAN         PtpReportButton;
-
-    BOOLEAN PtpInputModeOn;
 
     UCHAR REPORTID_MULTITOUCH_COLLECTION;
     UCHAR REPORTID_MOUSE_COLLECTION;
