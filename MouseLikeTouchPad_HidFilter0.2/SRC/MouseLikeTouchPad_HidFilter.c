@@ -770,7 +770,7 @@ FilterEvtIoIntDeviceControl(
             status = PtpFilterGetStrings(queueContext->Device, Request, &requestPending);
             break;
         case IOCTL_HID_READ_REPORT:
-            runtimes_IOREAD++;
+            ++runtimes_IOREAD;
             if (runtimes_IOREAD == 1) {
                 KdPrint(("FilterEvtIoIntDeviceControl IOCTL_HID_READ_REPORT,%x\n", runtimes_IOREAD));
             }
@@ -1177,7 +1177,10 @@ PtpFilterInputProcessRequest(
 	// Otherwise we will let power recovery process to triage it
 	if (deviceContext->DeviceConfigured == TRUE) {
 		PtpFilterInputIssueTransportRequest(Device);
+        KdPrint(("PtpFilterInputProcessRequest ok,%x\n", runtimes_IOREAD));
 	}
+
+    KdPrint(("PtpFilterInputProcessRequest end,%x\n", runtimes_IOREAD));
 }
 
 
@@ -1206,6 +1209,8 @@ PtpFilterInputIssueTransportRequest(
 	BOOLEAN requestStatus = FALSE;
 
 	deviceContext = PtpFilterGetContext(Device);
+
+    KdPrint(("PtpFilterInputIssueTransportRequest start,%x\n", runtimes_IOREAD));
 
 	WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&attributes, WORKER_REQUEST_CONTEXT);
 	attributes.ParentObject = Device;
@@ -1272,6 +1277,8 @@ PtpFilterInputIssueTransportRequest(
 			WdfObjectDelete(hidReadRequest);
 		}
 	}
+
+    KdPrint(("PtpFilterInputIssueTransportRequest end,%x\n", runtimes_IOREAD));
 }
 
 VOID
@@ -1304,7 +1311,7 @@ PtpFilterInputRequestCompletionCallback(
     size_t OutputSize = sizeof(PTP_REPORT);
 
     RtlZeroMemory(&OutputReport, OutputSize);
-    KdPrint(("PtpFilterInputRequestCompletionCallback start,%x\n", runtimes_IOREAD));
+    KdPrint(("\n PtpFilterInputRequestCompletionCallback start,%x\n", runtimes_IOREAD));
 
 	// Pre-flight check 1: if size is 0, this is not something we need. Ignore the read, and issue next request.
 	if (responseLength <= 0) {
@@ -1422,7 +1429,7 @@ PtpFilterInputRequestCompletionCallback(
         //if (!NT_SUCCESS(status)) {
         //    KdPrint(("OnInterruptIsr SendOriginalReport failed,%x\n", runtimes_ioControl));
         //}
-        KdPrint(("PtpFilterInputRequestCompletionCallback PtpInputModeOn not ready,%x\n", runtimes_IOCTL));
+        KdPrint(("PtpFilterInputRequestCompletionCallback PtpInputModeOn not ready,%x\n", runtimes_IOREAD));
         goto cleanup;
     }
 
@@ -1478,6 +1485,8 @@ PtpFilterInputRequestCompletionCallback(
         MouseLikeTouchPad_parse(deviceContext, &ptpReport);
     }
 
+
+    KdPrint(("PtpFilterInputRequestCompletionCallback end1,%x\n", runtimes_IOREAD));
 
 cleanup:
 	// Cleanup
@@ -2199,8 +2208,10 @@ SendPtpMouseReport(PDEVICE_CONTEXT pDevContext, struct mouse_report_t* pMouseRep
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
     WdfRequestComplete(PtpRequest, status);
 
+    KdPrint(("SendPtpMouseReport ok,%x\n", runtimes_IOREAD));
 
 exit:
+    KdPrint(("SendPtpMouseReport ok2,%x\n", runtimes_IOREAD));
     KdPrint(("SendPtpMouseReport end,%x\n", status));
     return status;
 
