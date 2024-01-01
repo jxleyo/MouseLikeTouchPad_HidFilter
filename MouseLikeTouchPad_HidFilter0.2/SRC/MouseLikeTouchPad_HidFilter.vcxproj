@@ -101,7 +101,7 @@
     <IncludePath>$(ProjectDir)include;$(SolutionDir)intermediate\$(ProjectName)\$(Platform)\$(ConfigurationName)\;$(IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\</OutDir>
     <IntDir>$(SolutionDir)$(Platform)\$(ConfigurationName)\</IntDir>
-    <TimeStampServer>http://timestamp.digicert.com</TimeStampServer>
+    <TimeStampServer>http://timestamp.verisign.com/scripts/timstamp.dll</TimeStampServer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>

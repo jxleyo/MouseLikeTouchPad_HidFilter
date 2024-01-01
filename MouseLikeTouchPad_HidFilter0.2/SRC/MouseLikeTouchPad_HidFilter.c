@@ -38,7 +38,7 @@ DriverEntry(
     WDF_DRIVER_CONFIG config;
     WDF_OBJECT_ATTRIBUTES attributes;
 
-    PAGED_CODE();
+    //PAGED_CODE();
 
     KdPrint(("DriverEntry start , %x\n", 0));
 
@@ -68,7 +68,7 @@ PtpFilterEvtDeviceAdd(
     NTSTATUS status;
 
     UNREFERENCED_PARAMETER(Driver);
-    PAGED_CODE();
+    //PAGED_CODE();
     
     // We do not own power control.
     // In addition we do not own every I/O request.
@@ -85,7 +85,7 @@ PtpFilterEvtDriverContextCleanup(
 )
 {
     UNREFERENCED_PARAMETER(DriverObject);
-    PAGED_CODE();
+    //PAGED_CODE();
 }
 
 
@@ -103,7 +103,7 @@ PtpFilterCreateDevice(
     PDEVICE_CONTEXT deviceContext;
     NTSTATUS status;
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     KdPrint(("PtpFilterCreateDevice start , %x\n", 0));
 
@@ -198,7 +198,7 @@ PtpFilterPrepareHardware(
     UNREFERENCED_PARAMETER(ResourceList);
     UNREFERENCED_PARAMETER(ResourceListTranslated);
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     deviceContext = PtpFilterGetContext(Device);
 
@@ -229,7 +229,7 @@ PtpFilterDeviceD0Entry(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    PAGED_CODE();
+    //PAGED_CODE();
     UNREFERENCED_PARAMETER(Device);
     UNREFERENCED_PARAMETER(PreviousState);
     
@@ -260,7 +260,7 @@ PtpFilterDeviceD0Exit(
 
     UNREFERENCED_PARAMETER(TargetState);
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     deviceContext = PtpFilterGetContext(Device);
 
@@ -309,6 +309,7 @@ PtpFilterSelfManagedIoInit(
     HID_DEVICE_ATTRIBUTES deviceAttributes;
 
     //PAGED_CODE();   
+
     runtimes_SelfManagedIoInit++;
 
     deviceContext = PtpFilterGetContext(Device);
@@ -480,7 +481,7 @@ PtpFilterConfigureMultiTouch(
     WDFREQUEST configRequest;
     PIRP pConfigIrp = NULL;
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     deviceContext = PtpFilterGetContext(Device);
 
@@ -602,7 +603,7 @@ PtpFilterDetourWindowsHIDStack(
     PIO_CLIENT_EXTENSION hidTransportIoClientExtension = NULL;
     PHIDCLASS_DRIVER_EXTENSION hidTransportClassExtension = NULL;
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     deviceContext = PtpFilterGetContext(Device);
 
@@ -691,7 +692,7 @@ PtpFilterIoQueueInitialize(
     PQUEUE_CONTEXT queueContext;
     NTSTATUS status;
 
-    PAGED_CODE();
+    //PAGED_CODE();
     
     deviceContext = PtpFilterGetContext(Device);
 
@@ -1303,11 +1304,12 @@ PtpFilterInputRequestCompletionCallback(
     size_t OutputSize = sizeof(PTP_REPORT);
 
     RtlZeroMemory(&OutputReport, OutputSize);
-    KdPrint(("PtpFilterInputRequestCompletionCallback start,%x\n", status));
+    KdPrint(("PtpFilterInputRequestCompletionCallback start,%x\n", runtimes_IOREAD));
 
 	// Pre-flight check 1: if size is 0, this is not something we need. Ignore the read, and issue next request.
 	if (responseLength <= 0) {
 		WdfWorkItemEnqueue(requestContext->DeviceContext->HidTransportRecoveryWorkItem);
+        KdPrint(("PtpFilterInputRequestCompletionCallback responseLength<0,%x\n",runtimes_IOREAD));
 		goto cleanup;
 	}
 
@@ -1484,7 +1486,7 @@ cleanup:
 		WdfObjectDelete(requestContext->RequestMemory);
 	}
 
-	KdPrint(("PtpFilterInputRequestCompletionCallback end,%x\n", status));
+	KdPrint(("PtpFilterInputRequestCompletionCallback end,%x\n", runtimes_IOREAD));
 	// We don't issue new request here (unless it's a spurious request - which is handled earlier) to
 	// keep the request pipe go through one-way.
 }
@@ -2231,11 +2233,14 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
         if (tp->currentFinger.Contacts[i].TipSwitch) {
             allFingerDetached = FALSE;
             currentFinger_Count = tp->currentFinger.ContactCount;//重新定义当前触摸点数量
+
+            KdPrint(("MouseLikeTouchPad_parse allFingerDetached = FALSE,%x\n", runtimes_IOREAD));
             break;
         }
     }
     if (allFingerDetached) {
         currentFinger_Count = 0;
+        KdPrint(("MouseLikeTouchPad_parse 手指全部离开,%x\n", runtimes_IOREAD));
     }
 
 
@@ -2272,6 +2277,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
         if (tp->nMouse_Pointer_LastIndex != -1) {
             if (tp->lastFinger.Contacts[tp->nMouse_Pointer_LastIndex].ContactID == tp->currentFinger.Contacts[i].ContactID) {
                 tp->nMouse_Pointer_CurrentIndex = i;//找到指针
+
+                KdPrint(("MouseLikeTouchPad_parse 找到指针 tp->nMouse_Pointer_CurrentIndex=,%x\n", tp->nMouse_Pointer_CurrentIndex));
                 continue;//查找其他功能
             }
         }
@@ -2279,6 +2286,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
         if (tp->nMouse_Wheel_LastIndex != -1) {
             if (tp->lastFinger.Contacts[tp->nMouse_Wheel_LastIndex].ContactID == tp->currentFinger.Contacts[i].ContactID) {
                 tp->nMouse_Wheel_CurrentIndex = i;//找到滚轮辅助键
+
+                KdPrint(("MouseLikeTouchPad_parse 找到滚轮辅助键 tp->nMouse_Wheel_CurrentIndex=,%x\n", tp->nMouse_Wheel_CurrentIndex));
                 continue;//查找其他功能
             }
         }
@@ -2287,6 +2296,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
             if (tp->lastFinger.Contacts[tp->nMouse_LButton_LastIndex].ContactID == tp->currentFinger.Contacts[i].ContactID) {
                 bMouse_LButton_Status = 1; //找到左键，
                 tp->nMouse_LButton_CurrentIndex = i;//赋值左键触摸点新索引号
+
+                KdPrint(("MouseLikeTouchPad_parse 找到左键 tp->nMouse_LButton_CurrentIndex=,%x\n", tp->nMouse_LButton_CurrentIndex));
                 continue;//查找其他功能
             }
         }
@@ -2295,6 +2306,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
             if (tp->lastFinger.Contacts[tp->nMouse_RButton_LastIndex].ContactID == tp->currentFinger.Contacts[i].ContactID) {
                 bMouse_RButton_Status = 1; //找到右键，
                 tp->nMouse_RButton_CurrentIndex = i;//赋值右键触摸点新索引号
+
+                KdPrint(("MouseLikeTouchPad_parse 找到右键 tp->nMouse_RButton_CurrentIndex=,%x\n", tp->nMouse_RButton_CurrentIndex));
                 continue;//查找其他功能
             }
         }
@@ -2303,12 +2316,26 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
             if (tp->lastFinger.Contacts[tp->nMouse_MButton_LastIndex].ContactID == tp->currentFinger.Contacts[i].ContactID) {
                 bMouse_MButton_Status = 1; //找到中键，
                 tp->nMouse_MButton_CurrentIndex = i;//赋值中键触摸点新索引号
+
+                KdPrint(("MouseLikeTouchPad_parse 找到中键 tp->nMouse_MButton_CurrentIndex=,%x\n", tp->nMouse_MButton_CurrentIndex));
                 continue;//查找其他功能
             }
         }
     }
 
-    KdPrint(("MouseLikeTouchPad_parse traced currentFinger_Count=,%x\n", currentFinger_Count));
+
+    KdPrint(("MouseLikeTouchPad_parse tp->nMouse_Pointer_CurrentIndex=,%x\n", tp->nMouse_Pointer_CurrentIndex));
+    KdPrint(("MouseLikeTouchPad_parse tp->nMouse_Pointer_LastIndex=,%x\n", tp->nMouse_Pointer_LastIndex));
+
+    if (tp->nMouse_Pointer_CurrentIndex != -1) {
+        KdPrint(("MouseLikeTouchPad_parse tp->currentFinger.Contacts[tp->nMouse_Pointer_CurrentIndex].X=,%x\n", tp->currentFinger.Contacts[tp->nMouse_Pointer_CurrentIndex].X));
+        KdPrint(("MouseLikeTouchPad_parse tp->currentFinger.Contacts[tp->nMouse_Pointer_CurrentIndex].Y=,%x\n", tp->currentFinger.Contacts[tp->nMouse_Pointer_CurrentIndex].Y));
+    }
+    if (tp->nMouse_Pointer_LastIndex != -1) {
+        KdPrint(("MouseLikeTouchPad_parse tp->lastFinger.Contacts[tp->nMouse_MButton_LastIndex].X=,%x\n", tp->lastFinger.Contacts[tp->nMouse_MButton_LastIndex].X));
+        KdPrint(("MouseLikeTouchPad_parse tp->lastFinger.Contacts[tp->nMouse_MButton_LastIndex].Y=,%x\n", tp->lastFinger.Contacts[tp->nMouse_MButton_LastIndex].Y));
+    }
+
 
     if (tp->currentFinger.IsButtonClicked) {//触摸板下沿物理按键功能,切换触控板灵敏度/滚轮模式开关等参数设置,需要进行离开判定，因为按键报告会一直发送直到释放
         tp->bPhysicalButtonUp = FALSE;//物理键是否释放标志
@@ -2394,6 +2421,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
                 && tp->currentFinger.Contacts[i].Y > tp->StartY_TOP && tp->currentFinger.Contacts[i].X > tp->StartX_LEFT && tp->currentFinger.Contacts[i].X < tp->StartX_RIGHT) {//起点坐标在误触横竖线以内
                 tp->nMouse_Pointer_CurrentIndex = i;  //首个触摸点作为指针
                 tp->MousePointer_DefineTime = tp->current_Ticktime;//定义当前指针起始时间
+
+                KdPrint(("MouseLikeTouchPad_parse 首个触摸点作为指针,%x\n", runtimes_IOREAD));
                 break;
             }
         }
@@ -2409,6 +2438,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
         tp->nMouse_RButton_CurrentIndex = -1;
         tp->nMouse_MButton_CurrentIndex = -1;
         tp->nMouse_Wheel_CurrentIndex = -1;
+
+        KdPrint(("MouseLikeTouchPad_parse 指针消失,%x\n", runtimes_IOREAD));
     }
     else if (tp->nMouse_Pointer_CurrentIndex != -1 && !tp->bMouse_Wheel_Mode) {  //指针已定义的非滚轮事件处理
         //查找指针左侧或者右侧是否有手指作为滚轮模式或者按键模式，当指针左侧/右侧的手指按下时间与指针手指定义时间间隔小于设定阈值时判定为鼠标滚轮否则为鼠标按键，这一规则能有效区别按键与滚轮操作,但鼠标按键和滚轮不能一起使用
@@ -2448,22 +2479,30 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
                     tp->nMouse_LButton_CurrentIndex = -1;
                     tp->nMouse_RButton_CurrentIndex = -1;
                     tp->nMouse_MButton_CurrentIndex = -1;
+
+                    KdPrint(("MouseLikeTouchPad_parse 开启滚轮模式,%x\n", runtimes_IOREAD));
                     break;
                 }
                 else {//前面滚轮模式条件判断已经排除了所以不需要考虑与指针手指起始定义时间间隔，
                     if (tp->nMouse_MButton_CurrentIndex == -1 && fabs(distance) > tp->FingerMinDistance && fabs(distance) < tp->FingerClosedThresholdDistance && dx < 0) {//指针左侧有并拢的手指按下
                         bMouse_MButton_Status = 1; //找到中键
                         tp->nMouse_MButton_CurrentIndex = i;//赋值中键触摸点新索引号
+
+                        KdPrint(("MouseLikeTouchPad_parse 找到中键,%x\n", runtimes_IOREAD));
                         continue;  //继续找其他按键，食指已经被中键占用所以原则上左键已经不可用
                     }
                     else if (tp->nMouse_LButton_CurrentIndex == -1 && fabs(distance) > tp->FingerClosedThresholdDistance && fabs(distance) < tp->FingerMaxDistance && dx < 0) {//指针左侧有分开的手指按下
                         bMouse_LButton_Status = 1; //找到左键
                         tp->nMouse_LButton_CurrentIndex = i;//赋值左键触摸点新索引号
+
+                        KdPrint(("MouseLikeTouchPad_parse 找到左键,%x\n", runtimes_IOREAD));
                         continue;  //继续找其他按键
                     }
                     else if (tp->nMouse_RButton_CurrentIndex == -1 && fabs(distance) > tp->FingerMinDistance && fabs(distance) < tp->FingerMaxDistance && dx > 0) {//指针右侧有手指按下
                         bMouse_RButton_Status = 1; //找到右键
                         tp->nMouse_RButton_CurrentIndex = i;//赋值右键触摸点新索引号
+
+                        KdPrint(("MouseLikeTouchPad_parse 找到右键,%x\n", runtimes_IOREAD));
                         continue;  //继续找其他按键
                     }
                 }
@@ -2474,6 +2513,7 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
         //鼠标指针位移设置
         if (currentFinger_Count != lastFinger_Count) {//手指变化瞬间时电容可能不稳定指针坐标突发性漂移需要忽略
             tp->JitterFixStartTime = tp->current_Ticktime;//抖动修正开始计时
+            KdPrint(("MouseLikeTouchPad_parse 抖动修正开始计时,%x\n", runtimes_IOREAD));
         }
         else {
             LARGE_INTEGER FixTimer;
@@ -2533,6 +2573,7 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
     else if (tp->nMouse_Pointer_CurrentIndex != -1 && tp->bMouse_Wheel_Mode) {//滚轮操作模式，触摸板双指滑动、三指四指手势也归为此模式下的特例设置一个手势状态开关供后续判断使用
         if (!pDevContext->bWheelScrollMode || currentFinger_Count > 2) {//触摸板双指滑动手势模式，三指四指手势也归为此模式
             tp->bPtpReportCollection = TRUE;//发送PTP触摸板集合报告，后续再做进一步判断
+            KdPrint(("MouseLikeTouchPad_parse 发送PTP触摸板集合报告，后续再做进一步判断,%x\n", runtimes_IOREAD));
         }
         else {
             //鼠标指针位移设置
@@ -2593,6 +2634,7 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
     }
     else {
         //其他组合无效
+        KdPrint(("MouseLikeTouchPad_parse 其他组合无效,%x\n", runtimes_IOREAD));
     }
 
 
@@ -2644,6 +2686,14 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
     }
     else {//发送MouseCollection
         mReport.button = bMouse_LButton_Status + (bMouse_RButton_Status << 1) + (bMouse_MButton_Status << 2) + (bMouse_BButton_Status << 3) + (bMouse_FButton_Status << 4);  //左中右后退前进键状态合成
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.report_id=,%x\n", mReport.report_id));
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.button=,%x\n", mReport.button));
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.dx=,%x\n", mReport.dx));
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.dy=,%x\n", mReport.dy));
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.v_wheel=,%x\n", mReport.v_wheel));
+        KdPrint(("MouseLikeTouchPad_parse SendPtpMouseReport mReport.h_wheel=,%x\n", mReport.h_wheel));
+
+
         //发送鼠标报告
         status = SendPtpMouseReport(pDevContext, &mReport);
         if (!NT_SUCCESS(status)) {
@@ -2661,6 +2711,8 @@ void MouseLikeTouchPad_parse(PDEVICE_CONTEXT pDevContext, PTP_REPORT* pPtpReport
     tp->nMouse_RButton_LastIndex = tp->nMouse_RButton_CurrentIndex;
     tp->nMouse_MButton_LastIndex = tp->nMouse_MButton_CurrentIndex;
     tp->nMouse_Wheel_LastIndex = tp->nMouse_Wheel_CurrentIndex;
+
+    KdPrint(("MouseLikeTouchPad_parse end,%x\n", runtimes_IOREAD));
 
 }
 
