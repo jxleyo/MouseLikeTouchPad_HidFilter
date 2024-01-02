@@ -802,7 +802,7 @@ FilterEvtIoIntDeviceControl(
             break;
     }
 
-    if (requestPending != TRUE)
+    if (!requestPending)
     {
         KdPrint(("FilterEvtIoIntDeviceControl Status,%x\n", status));
         WdfRequestComplete(Request, status);
@@ -1327,6 +1327,7 @@ PtpFilterInputRequestCompletionCallback(
 
     if (deviceContext->VendorID == 0x6cb) {//synaptic´¥Ãþ°åÉè±¸vendorID£¬lenovo yoga 14s 2021 laptops I2C HID
         InputSize = sizeof(PTP_REPORT);
+        KdPrint(("PtpFilterInputRequestCompletionCallback VendorID=,%x\n", deviceContext->VendorID));
 
         if (responseLength == InputSize) {
             PTP_REPORT InputReport = *(PTP_REPORT*)TouchDataBuffer;
@@ -1349,6 +1350,7 @@ PtpFilterInputRequestCompletionCallback(
     }
     else if (deviceContext->VendorID == 0x17ef) {//lenovo Duet BT Folio
         InputSize = sizeof(PTP_REPORT_DUET);
+        KdPrint(("PtpFilterInputRequestCompletionCallback VendorID=,%x\n", deviceContext->VendorID));
 
         if (responseLength == InputSize) {
             PTP_REPORT_DUET InputReport = *(PTP_REPORT_DUET*)TouchDataBuffer;
@@ -1391,6 +1393,7 @@ PtpFilterInputRequestCompletionCallback(
     }
     else if (deviceContext->VendorID == 0x48D) {//deviceContext->ProductID == 0x8911 
         InputSize = sizeof(PTP_REPORT);
+        KdPrint(("PtpFilterInputRequestCompletionCallback VendorID=,%x\n", deviceContext->VendorID));
 
         if (responseLength == InputSize) {
             PTP_REPORT InputReport = *(PTP_REPORT*)TouchDataBuffer;
@@ -2141,9 +2144,8 @@ SendPtpMultiTouchReport(PDEVICE_CONTEXT pDevContext, PVOID MultiTouchReport, siz
     status = WdfIoQueueRetrieveNextRequest(pDevContext->HidReadQueue, &PtpRequest);
     if (!NT_SUCCESS(status)) {
         KdPrint(("SendPtpMultiTouchReport WdfIoQueueRetrieveNextRequest failed,%x\n", status));
-        goto exit;
+        goto cleanup;
     }
-
 
     status = WdfRequestRetrieveOutputMemory(PtpRequest, &ptpRequestMemory);
     if (!NT_SUCCESS(status))
@@ -2162,10 +2164,15 @@ SendPtpMultiTouchReport(PDEVICE_CONTEXT pDevContext, PVOID MultiTouchReport, siz
     }
 
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
-    WdfRequestComplete(PtpRequest, status);
-
+    KdPrint(("SendPtpMultiTouchReport ok,%x\n", status));
 
 exit:
+    WdfRequestComplete(
+        PtpRequest,
+        status
+    );
+
+cleanup:
     KdPrint(("SendPtpMultiTouchReport end,%x\n", status));
     return status;
 
@@ -2185,9 +2192,8 @@ SendPtpMouseReport(PDEVICE_CONTEXT pDevContext, struct mouse_report_t* pMouseRep
     status = WdfIoQueueRetrieveNextRequest(pDevContext->HidReadQueue, &PtpRequest);
     if (!NT_SUCCESS(status)) {
         KdPrint(("SendPtpMouseReport WdfIoQueueRetrieveNextRequest failed,%x\n", status));
-        goto exit;
+        goto cleanup;
     }
-
 
     status = WdfRequestRetrieveOutputMemory(PtpRequest, &ptpRequestMemory);
     if (!NT_SUCCESS(status))
@@ -2206,15 +2212,18 @@ SendPtpMouseReport(PDEVICE_CONTEXT pDevContext, struct mouse_report_t* pMouseRep
     }
 
     WdfRequestSetInformation(PtpRequest, outputBufferLength);
-    WdfRequestComplete(PtpRequest, status);
-
     KdPrint(("SendPtpMouseReport ok,%x\n", runtimes_IOREAD));
 
 exit:
+    WdfRequestComplete(
+        PtpRequest,
+        status
+    );
+
+cleanup:
     KdPrint(("SendPtpMouseReport ok2,%x\n", runtimes_IOREAD));
     KdPrint(("SendPtpMouseReport end,%x\n", status));
     return status;
-
 }
 
 
