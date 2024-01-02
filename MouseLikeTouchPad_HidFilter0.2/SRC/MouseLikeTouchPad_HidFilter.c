@@ -2018,10 +2018,56 @@ NTSTATUS GetRegConfig(PDEVICE_CONTEXT pDevContext, WCHAR* strConfigName, PULONG 
 VOID init(PDEVICE_CONTEXT pDevContext) {
     NTSTATUS status = STATUS_SUCCESS;
 
+
+    //读取设备类型设置
+    pDevContext->DeviceType_Index = 1;
+
+    ULONG dt_idx;
+    status = GetRegisterDeviceType(pDevContext, &dt_idx);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("init GetRegisterDeviceType err,%x\n", status));
+        status = SetRegisterDeviceType(pDevContext, pDevContext->DeviceType_Index);//初始默认设置
+        if (!NT_SUCCESS(status)) {
+            KdPrint(("init SetRegisterDeviceType err,%x\n", status));
+        }
+    }
+    else {
+        if (dt_idx > 2) {//如果读取的数值错误
+            dt_idx = pDevContext->DeviceType_Index;//恢复初始默认值
+        }
+        pDevContext->DeviceType_Index = (UCHAR)dt_idx;
+        KdPrint(("init GetRegisterDeviceType DeviceType_Index=,%x\n", pDevContext->DeviceType_Index));
+    }
+
+
+    //读取触摸板相对空格键对齐位置布局设置
+    pDevContext->SpaceLayout_Index = 1;
+
+    ULONG sl_idx;
+    status = GetRegisterSpaceLayout(pDevContext, &sl_idx);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("init GetRegisterSpaceLayout err,%x\n", status));
+        status = SetRegisterSpaceLayout(pDevContext, pDevContext->SpaceLayout_Index);//初始默认设置
+        if (!NT_SUCCESS(status)) {
+            KdPrint(("init SetRegisterSpaceLayout err,%x\n", status));
+        }
+    }
+    else {
+        if (sl_idx > 2) {//如果读取的数值错误
+            sl_idx = pDevContext->SpaceLayout_Index;//恢复初始默认值
+        }
+        pDevContext->SpaceLayout_Index = (UCHAR)sl_idx;
+        KdPrint(("init GetRegisterSpaceLayout DeviceType_Index=,%x\n", pDevContext->DeviceType_Index));
+    }
+
+
+
+    //读取指头大小设置
     pDevContext->ThumbScale_Index = 1;
     pDevContext->ThumbScale_Value = ThumbScaleTable[pDevContext->ThumbScale_Index];
 
-    //读取指头大小设置
     ULONG ts_idx;
     status = GetRegisterThumbScale(pDevContext, &ts_idx);
     if (!NT_SUCCESS(status))
@@ -2050,11 +2096,10 @@ VOID init(PDEVICE_CONTEXT pDevContext) {
 
 
 
-    //
+    //读取鼠标灵敏度设置
     pDevContext->MouseSensitivity_Index = 1;//默认初始值为MouseSensitivityTable存储表的序号1项
     pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];//默认初始值为1.0
 
-    //读取鼠标灵敏度设置
     ULONG ms_idx;
     status = GetRegisterMouseSensitivity(pDevContext, &ms_idx);
     if (!NT_SUCCESS(status))
@@ -2846,3 +2891,74 @@ void SetNextSensitivity(PDEVICE_CONTEXT pDevContext)
 
 }
 
+
+NTSTATUS SetRegisterDeviceType(PDEVICE_CONTEXT pDevContext, ULONG dt_idx)//保存设置到注册表
+{
+    ////TouchpadDeviceType（触摸板类型，关联否开启防误触功能）
+    //0 - TP笔记本电脑内置触摸板Built in（有防误触功能）
+    //    1 - 外置独立触摸板External TouchPad（无防误触功能）
+    //    2 - 外置触摸板键盘External TouchPad Keyboard（有防误触功能）
+
+    NTSTATUS status = STATUS_SUCCESS;
+
+    status = SetRegConfig(pDevContext, L"DeviceType_Index", dt_idx);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("SetRegisterDeviceType err,%x\n", status));
+        return status;
+    }
+
+    KdPrint(("SetRegisterDeviceType ok,%x\n", status));
+    return status;
+}
+
+
+NTSTATUS GetRegisterDeviceType(PDEVICE_CONTEXT pDevContext, ULONG* dt_idx)//从注册表读取设置
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    *dt_idx = 0;
+
+    status = GetRegConfig(pDevContext, L"DeviceType_Index", dt_idx);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("GetRegisterDeviceType err,%x\n", status));
+        return status;
+    }
+
+    KdPrint(("GetRegisterDeviceType ok,%x\n", status));
+    return status;
+}
+
+
+NTSTATUS SetRegisterSpaceLayout(PDEVICE_CONTEXT pDevContext, ULONG sl_idx)//保存设置到注册表
+{
+    //TouchpadSpaceLayout(触摸板相对空格键对齐位置布局设计，关联防误触的区域计算）
+    //    0 - 居中布局CenterAlign
+    //    1 - 偏右设计RightAlign
+    //    2 - 偏左设计LeftAlign
+
+    NTSTATUS status = STATUS_SUCCESS;
+
+    status = SetRegConfig(pDevContext, L"SpaceLayout_Index", sl_idx);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("SetRegisterSpaceLayout err,%x\n", status));
+        return status;
+    }
+
+    KdPrint(("SetRegisterSpaceLayout ok,%x\n", status));
+    return status;
+}
+
+
+NTSTATUS GetRegisterSpaceLayout(PDEVICE_CONTEXT pDevContext, ULONG* sl_idx)//从注册表读取设置
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    *sl_idx = 0;
+
+    status = GetRegConfig(pDevContext, L"SpaceLayout_Index", sl_idx);
+    if (!NT_SUCCESS(status)) {
+        KdPrint(("GetRegisterSpaceLayout err,%x\n", status));
+        return status;
+    }
+
+    KdPrint(("GetRegisterSpaceLayout ok,%x\n", status));
+    return status;
+}

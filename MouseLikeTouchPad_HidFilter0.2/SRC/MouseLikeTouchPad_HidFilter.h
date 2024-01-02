@@ -1091,6 +1091,9 @@ typedef struct _DEVICE_CONTEXT
     //MouseLikeTouchpad Paser context
     PTP_PARSER  tp_settings; //PTP_PARSERÊý¾Ý
 
+    UCHAR DeviceType_Index;
+    UCHAR SpaceLayout_Index;
+
     UCHAR MouseSensitivity_Index;
     double MouseSensitivity_Value;
 
@@ -1141,6 +1144,13 @@ void SetNextThumbScale(PDEVICE_CONTEXT pDevContext);
 
 NTSTATUS GetRegisterThumbScale(PDEVICE_CONTEXT pDevContext, ULONG* ts_idx);
 NTSTATUS SetRegisterThumbScale(PDEVICE_CONTEXT pDevContext, ULONG ts_idx);
+
+NTSTATUS SetRegisterDeviceType(PDEVICE_CONTEXT pDevContext, ULONG dt_idx);
+NTSTATUS GetRegisterDeviceType(PDEVICE_CONTEXT pDevContext, ULONG* dt_idx);
+
+NTSTATUS SetRegisterSpaceLayout(PDEVICE_CONTEXT pDevContext, ULONG sl_idx);
+NTSTATUS GetRegisterSpaceLayout(PDEVICE_CONTEXT pDevContext, ULONG* sl_idx);
+
 
 NTSTATUS
 SendPtpMultiTouchReport(PDEVICE_CONTEXT pDevContext, PVOID MultiTouchReport, size_t outputBufferLength);
