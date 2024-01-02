@@ -1759,52 +1759,7 @@ AnalyzeHidReportDescriptor(
     tp->TouchPad_DPMM_y = (float)(tp->logicalMax_Y / tp->physical_Height_mm);//单位为dot/mm
     KdPrint(("AnalyzeHidReportDescriptor TouchPad_DPMM_x=,%x\n", (ULONG)tp->TouchPad_DPMM_x));
     KdPrint(("AnalyzeHidReportDescriptor TouchPad_DPMM_y=,%x\n", (ULONG)tp->TouchPad_DPMM_y));
-
-
-    tp->PointerSensitivity_x = tp->TouchPad_DPMM_x / 25;
-    tp->PointerSensitivity_y = tp->TouchPad_DPMM_y / 25;
-
-    tp->StartY_TOP = (ULONG)(10 * tp->TouchPad_DPMM_y);////起点误触横线Y值为距离触摸板顶部10mm处的Y坐标
-
-    //触摸板中心线较空格键中心线偏右10mm，然后不同的触摸板尺寸以此中心线为对称轴设计位置布局，DisabledX_RIGHT触摸板右侧区域防误触范围更大，
-    ULONG Offset = (ULONG)(10 * tp->TouchPad_DPMM_x);//触摸板中心线较空格键中心线偏右10mm，
-    ULONG SpaceCenterline = (ULONG)(40 * tp->TouchPad_DPMM_x);//起点误触竖线X值为距离空格键中心线左右侧40mm处的X坐标,
-    ULONG HalfWidthX = tp->logicalMax_X / 2;//触摸板一半宽度数值
-
-    LONG DisabledX_LEFT = HalfWidthX - SpaceCenterline - Offset;
-    ULONG DisabledX_RIGHT = HalfWidthX + SpaceCenterline - Offset;
-
-    if (DisabledX_LEFT < 0) {
-        tp->StartX_LEFT = 0;
-    }
-    else {
-        tp->StartX_LEFT = DisabledX_LEFT;
-    }
-
-    if (DisabledX_RIGHT > tp->logicalMax_X) {
-        tp->StartX_RIGHT = tp->logicalMax_X;
-    }
-    else {
-        tp->StartX_RIGHT = DisabledX_RIGHT;
-    }
-
-    //触摸板边角功能键区域坐标
-    if (HalfWidthX > SpaceCenterline) {
-        //
-        tp->CornerX_LEFT = HalfWidthX - SpaceCenterline;
-        tp->CornerX_RIGHT = HalfWidthX + SpaceCenterline;
-    }
-    else {
-        tp->CornerX_LEFT = Offset;
-        tp->CornerX_RIGHT = tp->logicalMax_X - Offset;
-    }
-
-    KdPrint(("AnalyzeHidReportDescriptor tp->StartTop_Y =,%x\n", tp->StartY_TOP));
-    KdPrint(("AnalyzeHidReportDescriptor tp->StartX_LEFT =,%x\n", tp->StartX_LEFT));
-    KdPrint(("AnalyzeHidReportDescriptor tp->StartX_RIGHT =,%x\n", tp->StartX_RIGHT));
-
-    KdPrint(("AnalyzeHidReportDescriptor tp->CornerX_LEFT =,%x\n", tp->CornerX_LEFT));
-    KdPrint(("AnalyzeHidReportDescriptor tp->CornerX_RIGHT =,%x\n", tp->CornerX_RIGHT));
+ 
 
     KdPrint(("AnalyzeHidReportDescriptor end,%x\n", status));
     return status;
@@ -2063,6 +2018,30 @@ VOID init(PDEVICE_CONTEXT pDevContext) {
     }
 
 
+    //读取鼠标灵敏度设置
+    pDevContext->MouseSensitivity_Index = 1;//默认初始值为MouseSensitivityTable存储表的序号1项
+    pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];//默认初始值为1.0
+
+    ULONG ms_idx;
+    status = GetRegisterMouseSensitivity(pDevContext, &ms_idx);
+    if (!NT_SUCCESS(status))
+    {
+        KdPrint(("init GetRegisterMouseSensitivity err,%x\n", status));
+        status = SetRegisterMouseSensitivity(pDevContext, pDevContext->MouseSensitivity_Index);//初始默认设置
+        if (!NT_SUCCESS(status)) {
+            KdPrint(("init SetRegisterMouseSensitivity err,%x\n", status));
+        }
+    }
+    else {
+        if (ms_idx > 2) {//如果读取的数值错误
+            ms_idx = pDevContext->MouseSensitivity_Index;//恢复初始默认值
+        }
+        pDevContext->MouseSensitivity_Index = (UCHAR)ms_idx;
+        pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];
+        KdPrint(("init GetRegisterMouseSensitivity MouseSensitivity_Index=,%x\n", pDevContext->MouseSensitivity_Index));
+    }
+
+
 
     //读取指头大小设置
     pDevContext->ThumbScale_Index = 1;
@@ -2087,6 +2066,8 @@ VOID init(PDEVICE_CONTEXT pDevContext) {
         KdPrint(("init GetRegisterThumbScale ThumbScale_Index=,%x\n", pDevContext->ThumbScale_Index));
     }
 
+    //
+
     PTP_PARSER* tp = &pDevContext->tp_settings;
     //动态调整手指头大小常量
     tp->thumb_Scale = pDevContext->ThumbScale_Index;//手指头尺寸缩放比例，
@@ -2094,30 +2075,84 @@ VOID init(PDEVICE_CONTEXT pDevContext) {
     tp->FingerClosedThresholdDistance = 16 * tp->TouchPad_DPMM_x * tp->thumb_Scale;//定义相邻手指合拢时的最小距离
     tp->FingerMaxDistance = tp->FingerMinDistance * 4;//定义有效的相邻手指最大距离(FingerMinDistance*4) 
 
+    tp->PointerSensitivity_x = tp->TouchPad_DPMM_x / 25;
+    tp->PointerSensitivity_y = tp->TouchPad_DPMM_y / 25;
 
+    //
+    ULONG Offset = 0;
+    ULONG SpaceCenterline;
+    ULONG HalfWidthX;
+    ULONG CornerWidth;
 
-    //读取鼠标灵敏度设置
-    pDevContext->MouseSensitivity_Index = 1;//默认初始值为MouseSensitivityTable存储表的序号1项
-    pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];//默认初始值为1.0
+    //TouchpadSpaceLayout(触摸板相对空格键对齐位置布局设计，关联防误触的区域计算）
+    if (pDevContext->SpaceLayout_Index == 0) {//居中布局CenterAlign
+        Offset = 0;//触摸板中心线较空格键中心线对齐，
+    }
+    else if (pDevContext->SpaceLayout_Index == 1) {//1-偏右5mm设计RightAlign5
+        Offset = (ULONG)(5 * tp->TouchPad_DPMM_x);//触摸板中心线较空格键中心线偏右5mm，
+    }
+    else if (pDevContext->SpaceLayout_Index == 2) {//2-偏右10mm设计RightAlign10
+        //触摸板中心线较空格键中心线偏右10mm，然后不同的触摸板尺寸以此中心线为对称轴设计位置布局，DisabledX_RIGHT触摸板右侧区域防误触范围更大，
+        Offset = (LONG)(10 * tp->TouchPad_DPMM_x);//触摸板中心线较空格键中心线偏左10mm，
+    }
 
-    ULONG ms_idx;
-    status = GetRegisterMouseSensitivity(pDevContext, &ms_idx);
-    if (!NT_SUCCESS(status))
-    {
-        KdPrint(("init GetRegisterMouseSensitivity err,%x\n", status));
-        status = SetRegisterMouseSensitivity(pDevContext, pDevContext->MouseSensitivity_Index);//初始默认设置
-        if (!NT_SUCCESS(status)) {
-            KdPrint(("init SetRegisterMouseSensitivity err,%x\n", status));
+    SpaceCenterline = (ULONG)(40 * tp->TouchPad_DPMM_x);//起点误触竖线X值为距离空格键中心线左右侧40mm处的X坐标,
+    HalfWidthX = tp->logicalMax_X / 2;//触摸板一半宽度数值
+    CornerWidth = (ULONG)(10 * tp->TouchPad_DPMM_x);//触摸板边角功能键区域宽度10mm，
+
+    //触摸板边角功能键区域坐标
+    if (HalfWidthX > SpaceCenterline) {
+        //
+        tp->CornerX_LEFT = HalfWidthX - SpaceCenterline;
+        if (tp->CornerX_LEFT < CornerWidth) {
+            tp->CornerX_LEFT = CornerWidth;
+        }
+        tp->CornerX_RIGHT = HalfWidthX + SpaceCenterline;
+        if (tp->CornerX_RIGHT > (tp->logicalMax_X - CornerWidth)) {
+            tp->CornerX_RIGHT = tp->logicalMax_X - CornerWidth;
         }
     }
     else {
-        if (ms_idx > 2) {//如果读取的数值错误
-            ms_idx = pDevContext->MouseSensitivity_Index;//恢复初始默认值
-        }
-        pDevContext->MouseSensitivity_Index = (UCHAR)ms_idx;
-        pDevContext->MouseSensitivity_Value = MouseSensitivityTable[pDevContext->MouseSensitivity_Index];
-        KdPrint(("init GetRegisterMouseSensitivity MouseSensitivity_Index=,%x\n", pDevContext->MouseSensitivity_Index));
+        tp->CornerX_LEFT = CornerWidth;
+        tp->CornerX_RIGHT = tp->logicalMax_X - CornerWidth;
     }
+
+    KdPrint(("AnalyzeHidReportDescriptor tp->CornerX_LEFT =,%x\n", tp->CornerX_LEFT));
+    KdPrint(("AnalyzeHidReportDescriptor tp->CornerX_RIGHT =,%x\n", tp->CornerX_RIGHT));
+
+
+    if (pDevContext->DeviceType_Index == 1) {//外置独立触摸板无需防误触功能
+        tp->StartY_TOP = 0;
+        tp->StartX_LEFT = 0;
+        tp->StartX_RIGHT = tp->logicalMax_X;
+    }
+    else {
+        tp->StartY_TOP = (ULONG)(10 * tp->TouchPad_DPMM_y);////起点误触横线Y值为距离触摸板顶部10mm处的Y坐标
+
+        LONG DisabledX_LEFT = HalfWidthX - SpaceCenterline - Offset;
+        ULONG DisabledX_RIGHT = HalfWidthX + SpaceCenterline - Offset;
+
+        if (DisabledX_LEFT < 0) {
+            tp->StartX_LEFT = 0;
+        }
+        else {
+            tp->StartX_LEFT = DisabledX_LEFT;
+        }
+
+        if (DisabledX_RIGHT > tp->logicalMax_X) {
+            tp->StartX_RIGHT = tp->logicalMax_X;
+        }
+        else {
+            tp->StartX_RIGHT = DisabledX_RIGHT;
+        }
+    }
+
+    KdPrint(("AnalyzeHidReportDescriptor tp->StartTop_Y =,%x\n", tp->StartY_TOP));
+    KdPrint(("AnalyzeHidReportDescriptor tp->StartX_LEFT =,%x\n", tp->StartX_LEFT));
+    KdPrint(("AnalyzeHidReportDescriptor tp->StartX_RIGHT =,%x\n", tp->StartX_RIGHT));
+
+
+
 
 
     MouseLikeTouchPad_parse_init(pDevContext);
@@ -2932,8 +2967,8 @@ NTSTATUS SetRegisterSpaceLayout(PDEVICE_CONTEXT pDevContext, ULONG sl_idx)//保存
 {
     //TouchpadSpaceLayout(触摸板相对空格键对齐位置布局设计，关联防误触的区域计算）
     //    0 - 居中布局CenterAlign
-    //    1 - 偏右设计RightAlign
-    //    2 - 偏左设计LeftAlign
+    //    1 - 偏右5mm设计RightAlign5
+    //    2 - 偏右10mm设计RightAlign10
 
     NTSTATUS status = STATUS_SUCCESS;
 
